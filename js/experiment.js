@@ -395,10 +395,102 @@ const recall_trials = {
   }
 }
 
+// Message trial showing "Saving your data and checking answers. Please do not close this page."
+const saving_message_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div class="instruction-text">
+      <h2>Saving your data and checking answers.</h2>
+      <p>Please do not close this page.</p>
+    </div>
+  `,
+  choices: "NO_KEYS",
+  trial_duration: 2000, // Show for 2 seconds while saving
+  data: {
+    trial_type: 'saving_message'
+  },
+  on_finish: function(data) {
+    data.recall_iteration = recall_state.outer_loop_iteration;
+  }
+};
+
+// Data saving trial after each recall test
+const save_data_recall = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID,
+  filename: `training_${filename}`,
+  data_string: () => jsPsych.data.get().csv(),
+  data: {
+    trial_type: 'save_data_recall'
+  },
+  on_finish: function(data) {
+    data.recall_iteration = recall_state.outer_loop_iteration;
+  }
+} : null;
+
+// Continue trial showing feedback based on recall performance
+const continue_after_save_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: function() {
+    // Calculate recall performance
+    const expectedTrialCount = angle_label_pairs.length;
+    const recallTrials = recall_state.current_iteration_trials;
+    const totalRecallTrials = recallTrials.length;
+    const correctRecallTrials = recallTrials.filter(trial => trial.is_correct === 1).length;
+    const requiredCorrect = EXPERIMENT_CONFIG.RECALL_THRESHOLD;
+    const thresholdMet = correctRecallTrials >= requiredCorrect && totalRecallTrials === expectedTrialCount;
+    
+    // Determine message based on performance
+    let message;
+    if (thresholdMet) {
+      message = "Great! You're ready to give the elves some directions!";
+    } else {
+      message = `You got ${correctRecallTrials}/${totalRecallTrials} directions correct. Please keep practicing!`;
+    }
+    
+    return `
+      <div class="instruction-text">
+        <p class="prompt-text">${message}</p>
+        <p class="prompt-text" style="margin-top: 20px;">Press any key to continue</p>
+      </div>
+    `;
+  },
+  choices: 'ALL_KEYS',
+  data: {
+    trial_type: 'continue_after_save'
+  },
+  on_finish: function(data) {
+    // Store recall performance data
+    const expectedTrialCount = angle_label_pairs.length;
+    const recallTrials = recall_state.current_iteration_trials;
+    const totalRecallTrials = recallTrials.length;
+    const correctRecallTrials = recallTrials.filter(trial => trial.is_correct === 1).length;
+    const requiredCorrect = EXPERIMENT_CONFIG.RECALL_THRESHOLD;
+    const thresholdMet = correctRecallTrials >= requiredCorrect && totalRecallTrials === expectedTrialCount;
+    
+    data.recall_correct = correctRecallTrials;
+    data.recall_total = totalRecallTrials;
+    data.recall_threshold_met = thresholdMet ? 1 : 0;
+    data.recall_iteration = recall_state.outer_loop_iteration;
+  }
+};
+
+// Build the timeline for saving after recall
+const save_after_recall_timeline = [];
+if (EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID) {
+  save_after_recall_timeline.push(saving_message_trial);
+  if (save_data_recall) {
+    save_after_recall_timeline.push(save_data_recall);
+  }
+  save_after_recall_timeline.push(continue_after_save_trial);
+}
+
 const familiarization_trials_outer_loop = {
   timeline: [familiarization_trials, 
     recall_instructions_trial, 
-    recall_trials],
+    recall_trials,
+    ...save_after_recall_timeline],
   on_timeline_start: function() {
     recall_state.outer_loop_iteration++;
     recall_state.current_iteration_trials = [];
