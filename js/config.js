@@ -35,8 +35,8 @@ const EXPERIMENT_CONFIG = {
   RECALL_THRESHOLD: 8, // Default: all 8 must be correct
   
   // Test trial time limit (in seconds)
-  TEST_TIME: 1, // Time limit for test trials
-  TEST_FEEDBACK_TIME: .25, // Time limit for test feedback trials
+  TEST_TIME: 5, // Time limit for test trials
+  TEST_FEEDBACK_TIME: 1, // Time limit for test feedback trials
 
   // Point to bonus scale
   POINT_TO_BONUS_SCALE: .001, //1 point = $0.01
