@@ -452,6 +452,11 @@ const test_instructions_trial = {
   choices: 'ALL_KEYS',
   data: {
     trial_type: 'test_instructions'
+  },
+  on_finish: function() {
+    // Initialize points display when test trials begin
+    totalPoints = 0;
+    initializePointsDisplay();
   }
 }
 
@@ -464,6 +469,170 @@ jsPsych.data.addProperties({
   selected_test_block_id: selectedTestBlock.block_id
 });
 
+// Track total points across test trials
+let totalPoints = 0;
+let currentTrialNumber = 0;
+let totalTestTrials = 0;
+
+// Function to initialize the points display at the top of the screen
+function initializePointsDisplay() {
+  totalTestTrials = selectedTestTrials.length;
+  currentTrialNumber = 0;
+  
+  const pointsDisplay = document.createElement('div');
+  pointsDisplay.id = 'total-points-display';
+  pointsDisplay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: #2196F3;
+    color: white;
+    padding: 15px 20px;
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 9999;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  `;
+  pointsDisplay.innerHTML = `
+    <div>Trial: <span id="trial-counter-value">0</span> / <span id="total-trials-value">${totalTestTrials}</span></div>
+    <div>Total Bonus: <span id="total-points-value">$0.00</span></div>
+  `;
+  document.body.insertBefore(pointsDisplay, document.body.firstChild);
+  
+  // Add padding to body to account for fixed header
+  document.body.style.paddingTop = '60px';
+}
+
+// Function to update the trial counter
+function updateTrialCounter() {
+  currentTrialNumber++;
+  const trialCounterEl = document.getElementById('trial-counter-value');
+  if (trialCounterEl) {
+    trialCounterEl.textContent = currentTrialNumber;
+  }
+}
+
+// Function to update the points display
+function updatePointsDisplay(pointsToAdd) {
+  totalPoints += pointsToAdd;
+  const pointsValueEl = document.getElementById('total-points-value');
+  if (pointsValueEl) {
+    // Format as currency (bonusPoints already includes POINT_TO_BONUS_SCALE conversion)
+    const dollarAmount = totalPoints;
+    pointsValueEl.textContent = '$' + dollarAmount.toFixed(2);
+  }
+}
+
+// Helper function to calculate angular distance (handling wrap-around)
+// Returns the minimum angular distance in either direction (clockwise or counterclockwise)
+// Examples: angularDistance(0, 10) = 10, angularDistance(0, 350) = 10, angularDistance(0, 180) = 180
+function angularDistance(a1, a2) {
+  const diff = Math.abs(a1 - a2);
+  return Math.min(diff, 360 - diff);
+}
+
+// Helper function to find angle for a given label
+function findAngleForLabel(label) {
+  const pair = angle_label_pairs.find(p => p.label.toLowerCase() === label.toLowerCase());
+  return pair ? pair.angle : null;
+}
+
+// Helper function to calculate bonus points based on distance
+// Points range from 0 to 45 based on distance between tested angle and entered word's angle
+function calculateBonusPoints(enteredAngle, testedAngle) {
+  if (enteredAngle === null) {
+    return 0; // Invalid response
+  }
+  
+  const distance = angularDistance(enteredAngle, testedAngle);
+  
+  // Maximum points for correct answer (distance = 0)
+  const maxPoints = 45;
+  
+  // Calculate raw points
+  let points;
+  if (distance === 0) {
+    points = maxPoints;
+  } else {
+    // Decrease points based on distance
+    // At 45 degrees (halfway between adjacent directions), give 0 points
+    // Linear interpolation: points = maxPoints * (1 - distance / 45)
+    points = Math.max(0, maxPoints * (1 - distance / 45));
+  }
+  
+  // Convert to dollars using the scale
+  const scale = EXPERIMENT_CONFIG.POINT_TO_BONUS_SCALE || 0.001;
+  const bonusDollars = points * scale;
+  console.log('Bonus calculation:', { points, scale, bonusDollars });
+  return Math.round(bonusDollars * 100) / 100; // Round to 2 decimal places
+}
+
+// Helper function to show feedback
+function showTestTrialFeedback(enteredAngle, testedAngle, bonusPoints) {
+  // Found treasure if entered label is valid (on the list) AND within 45 degrees of tested angle (in either direction)
+  // Missed if entered label is not on the list OR more than 45 degrees away (in either direction)
+  const distance = enteredAngle !== null ? angularDistance(enteredAngle, testedAngle) : Infinity;
+  const foundTreasure = enteredAngle !== null && distance <= 45;
+  const imageSrc = foundTreasure ? 'stimuli/images/treasure.png' : 'stimuli/images/hole.png';
+  
+  const feedbackArea = document.getElementById('test-feedback-area');
+  if (!feedbackArea) return;
+  
+  // Create feedback HTML
+  const feedbackHTML = `
+    <div style="
+      text-align: center;
+      padding: 20px;
+    ">
+      <img src="stimuli/images/elf.png" alt="Elf" style="width: 100px; height: auto; margin-bottom: 15px;" />
+      <img src="${imageSrc}" alt="${foundTreasure ? 'Treasure' : 'Hole'}" style="width: 100px; height: auto; margin-bottom: 15px;" />
+      <h3 style="margin: 15px 0; font-size: 24px; color: #333;">
+        ${foundTreasure ? 'Treasure Found!' : 'Missed!'}
+      </h3>
+      <p style="font-size: 18px; color: #666; margin: 10px 0;">
+        Bonus: <strong style="color: #2196F3; font-size: 20px;">$${(bonusPoints || 0).toFixed(2)}</strong>
+      </p>
+    </div>
+  `;
+  
+  // Show feedback in the feedback area
+  feedbackArea.innerHTML = feedbackHTML;
+  feedbackArea.style.visibility = 'visible';
+  feedbackArea.style.opacity = '1';
+  feedbackArea.style.transition = 'opacity 0.3s';
+  
+  // Hide feedback after TEST_FEEDBACK_TIME
+  setTimeout(function() {
+    const area = document.getElementById('test-feedback-area');
+    if (area) {
+      area.style.transition = 'opacity 0.2s';
+      area.style.opacity = '0';
+      // Wait for the fade-out transition to complete (0.3s = 300ms)
+      setTimeout(function() {
+        const area2 = document.getElementById('test-feedback-area');
+        if (area2) {
+          area2.style.visibility = 'hidden';
+          area2.innerHTML = '';
+        }
+      }, 300); // Wait for transition duration, not feedback time
+    }
+  }, EXPERIMENT_CONFIG.TEST_FEEDBACK_TIME * 1000);
+}
+
+// Store trial data for feedback
+let lastTrialData = null;
+// Store timeout timer reference
+let testTrialTimeout = null;
+// Store countdown interval reference
+let testTrialCountdownInterval = null;
+// Track if current trial timed out
+let currentTrialTimedOut = false;
+
 const test_trial = {
   type: jsPsychSurveyHtmlForm,
   html: function() {
@@ -471,10 +640,23 @@ const test_trial = {
     const label = jsPsych.evaluateTimelineVariable('label');
     const compassHTML = createCompassHTML(angle);
     return `
-      <div class="compass-container">
-        ${compassHTML}    
-        <p class="compass-instruction">What is this direction called?</p>
-        <input type="text" id="test-response" name="test-response" class="compass-input" autocomplete="off" autofocus />
+      <div class="compass-container" style="display: flex; align-items: flex-start; justify-content: center; gap: 40px; max-width: 1000px; margin: 0 auto;">
+        <div style="flex: 0 0 auto; width: 300px;">
+          ${compassHTML}    
+          <p class="compass-instruction">What is this direction called?</p>
+          <div id="test-countdown" style="
+            text-align: center;
+            font-size: 16px;
+            font-weight: normal;
+            color: #666;
+            margin: 10px 0;
+            min-height: 25px;
+          "></div>
+          <input type="text" id="test-response" name="test-response" class="compass-input" autocomplete="off" autofocus />
+        </div>
+        <div style="flex: 0 0 300px; min-height: 300px;">
+          <!-- Placeholder to keep compass in same position -->
+        </div>
       </div>
     `;
   },
@@ -482,7 +664,88 @@ const test_trial = {
   data: {
     trial_type: 'test'
   },
+  on_load: function() {
+    // Reset timeout flag for new trial
+    currentTrialTimedOut = false;
+    
+    // Clear any existing timeout and countdown interval
+    if (testTrialTimeout) {
+      clearTimeout(testTrialTimeout);
+      testTrialTimeout = null;
+    }
+    if (testTrialCountdownInterval) {
+      clearInterval(testTrialCountdownInterval);
+      testTrialCountdownInterval = null;
+    }
+    
+    // Initialize countdown display
+    const countdownElement = document.getElementById('test-countdown');
+    const totalSeconds = EXPERIMENT_CONFIG.TEST_TIME;
+    let remainingSeconds = totalSeconds;
+    
+    // Update countdown display immediately
+    if (countdownElement) {
+      countdownElement.textContent = `Time remaining: ${remainingSeconds}s`;
+    }
+    
+    // Update countdown every second
+    testTrialCountdownInterval = setInterval(function() {
+      remainingSeconds--;
+      if (countdownElement) {
+        if (remainingSeconds > 0) {
+          countdownElement.textContent = `Time remaining: ${remainingSeconds}s`;
+        } else {
+          countdownElement.textContent = 'Time\'s up!';
+        }
+      }
+    }, 1000);
+    
+    // Start timer - convert TEST_TIME from seconds to milliseconds
+    const timeoutMs = EXPERIMENT_CONFIG.TEST_TIME * 1000;
+    testTrialTimeout = setTimeout(function() {
+      // Clear countdown interval
+      if (testTrialCountdownInterval) {
+        clearInterval(testTrialCountdownInterval);
+        testTrialCountdownInterval = null;
+      }
+      
+      // Timeout expired - mark trial as timed out and finish it
+      currentTrialTimedOut = true;
+      const form = document.querySelector('#jspsych-survey-html-form');
+      if (form) {
+        // Clear the input field to ensure empty response
+        const inputField = form.querySelector('#test-response');
+        if (inputField) {
+          inputField.value = '';
+        }
+        // Submit the form with empty response
+        const submitButton = form.querySelector('input[type="submit"]');
+        if (submitButton) {
+          submitButton.click();
+        } else {
+          // Fallback: trigger form submission directly
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }
+    }, timeoutMs);
+  },
   on_finish: function(data) {
+    // Clear the timeout and countdown interval if they're still running (user submitted before timeout)
+    if (testTrialTimeout) {
+      clearTimeout(testTrialTimeout);
+      testTrialTimeout = null;
+    }
+    if (testTrialCountdownInterval) {
+      clearInterval(testTrialCountdownInterval);
+      testTrialCountdownInterval = null;
+    }
+    
+    // Check if this trial timed out
+    const timedOut = currentTrialTimedOut;
+    
+    // Update trial counter
+    updateTrialCounter();
+    
     const label = jsPsych.evaluateTimelineVariable('label');
     const angle = jsPsych.evaluateTimelineVariable('angle');
     const trialId = jsPsych.evaluateTimelineVariable('trial_id');
@@ -492,8 +755,64 @@ const test_trial = {
     const trialType = jsPsych.evaluateTimelineVariable('trial_type');
     const isCritical = jsPsych.evaluateTimelineVariable('is_critical');
     const targetFreq = jsPsych.evaluateTimelineVariable('targetFreq');
-    const response = data.response['test-response'].toLowerCase().trim();
-    const isCorrect = response === label.toLowerCase() ? 1 : 0;
+    
+    // Safely get response with null checks
+    const responseValue = (data.response && data.response['test-response']) || '';
+    const response = responseValue.toLowerCase ? responseValue.toLowerCase().trim() : '';
+    const labelLower = label ? label.toLowerCase() : '';
+    const isCorrect = response === labelLower ? 1 : 0;
+    
+    // If timed out, set bonus points to 0 and empty response
+    let enteredAngle = null;
+    let bonusPoints = 0;
+    let distanceToTreasure = null;
+    
+    if (timedOut) {
+      // Timeout - no points
+      bonusPoints = 0;
+    } else {
+      // Calculate bonus points based on distance between tested angle and entered word's angle
+      enteredAngle = findAngleForLabel(response);
+      bonusPoints = calculateBonusPoints(enteredAngle, angle);
+      distanceToTreasure = enteredAngle !== null 
+        ? angularDistance(enteredAngle, angle) 
+        : null;
+    }
+    
+    // Debug logging
+    console.log('=== Test Trial Debug ===');
+    console.log('Trial ID:', trialId);
+    console.log('Timed out:', timedOut);
+    console.log('Entered response:', response);
+    console.log('Target label:', label);
+    console.log('Tested angle (target):', angle);
+    console.log('Entered angle:', enteredAngle !== null ? enteredAngle : 'NOT FOUND (invalid label)');
+    console.log('Distance from target angle:', distanceToTreasure !== null ? distanceToTreasure + ' degrees' : 'N/A (invalid label)');
+    console.log('Bonus points:', bonusPoints);
+    console.log('Found treasure:', enteredAngle !== null && distanceToTreasure !== null && distanceToTreasure <= 45);
+    console.log('=======================');
+    
+    // Update total points display
+    updatePointsDisplay(bonusPoints);
+    
+    // Store trial data for feedback trial
+    lastTrialData = {
+      angle: angle,
+      label: label,
+      response: response,
+      enteredAngle: enteredAngle,
+      bonusPoints: bonusPoints,
+      distanceToTreasure: distanceToTreasure,
+      isCorrect: isCorrect,
+      trialId: trialId,
+      nearestTrainedAngle: nearestTrainedAngle,
+      nextNearestLabel: nextNearestLabel,
+      nextNearestAngle: nextNearestAngle,
+      trialType: trialType,
+      isCritical: isCritical,
+      targetFreq: targetFreq,
+      timedOut: timedOut
+    };
     
     data.is_correct = isCorrect;
     data.response_text = response;
@@ -506,11 +825,97 @@ const test_trial = {
     data.trial_type = trialType;
     data.is_critical = isCritical;
     data.targetFreq = targetFreq;
+    data.bonus_points = bonusPoints;
+    data.distance_to_treasure = distanceToTreasure;
+    data.entered_angle = enteredAngle;
+    data.total_points = totalPoints;
+    data.timed_out = timedOut ? 1 : 0;
   }
 }
 
+// Feedback trial that shows compass and feedback
+const test_feedback_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: function() {
+    if (!lastTrialData) {
+      return '<p>Loading feedback...</p>';
+    }
+    
+    const compassHTML = createCompassHTML(lastTrialData.angle);
+    const timedOut = lastTrialData.timedOut === true;
+    
+    // If timed out, show timeout message
+    if (timedOut) {
+      return `
+        <div class="compass-container" style="display: flex; align-items: flex-start; justify-content: center; gap: 40px; max-width: 1000px; margin: 0 auto;">
+          <div style="flex: 0 0 auto; width: 300px;">
+            ${compassHTML}
+            <p class="compass-instruction" style="visibility: hidden; margin: 20px 0;">What is this direction called?</p>
+            <input type="text" style="visibility: hidden; font-size: 18px; padding: 10px; width: 200px; margin: 20px auto; display: block;" />
+          </div>
+          <div style="
+            flex: 0 0 300px;
+            text-align: center;
+            padding: 20px;
+          ">
+            <img src="stimuli/images/elf.png" alt="Elf" style="width: 100px; height: auto; margin-bottom: 15px;" />
+            <img src="stimuli/images/hole.png" alt="Hole" style="width: 100px; height: auto; margin-bottom: 15px;" />
+            <h3 style="margin: 15px 0; font-size: 24px; color: #d32f2f;">
+              Oops, you didn't answer in time!
+            </h3>
+            <p style="font-size: 18px; color: #666; margin: 10px 0;">
+              Bonus: <strong style="color: #2196F3; font-size: 20px;">$${(lastTrialData.bonusPoints || 0).toFixed(2)}</strong>
+            </p>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Normal feedback (not timed out)
+    const distance = lastTrialData.enteredAngle !== null 
+      ? angularDistance(lastTrialData.enteredAngle, lastTrialData.angle) 
+      : Infinity;
+    const foundTreasure = lastTrialData.enteredAngle !== null && distance <= 45;
+    const imageSrc = foundTreasure ? 'stimuli/images/treasure.png' : 'stimuli/images/hole.png';
+    
+    return `
+      <div class="compass-container" style="display: flex; align-items: flex-start; justify-content: center; gap: 40px; max-width: 1000px; margin: 0 auto;">
+        <div style="flex: 0 0 auto; width: 300px;">
+          ${compassHTML}
+          <p class="compass-instruction" style="visibility: hidden; margin: 20px 0;">What is this direction called?</p>
+          <input type="text" style="visibility: hidden; font-size: 18px; padding: 10px; width: 200px; margin: 20px auto; display: block;" />
+        </div>
+        <div style="
+          flex: 0 0 300px;
+          text-align: center;
+          padding: 20px;
+        ">
+          <img src="stimuli/images/elf.png" alt="Elf" style="width: 100px; height: auto; margin-bottom: 15px;" />
+          <img src="${imageSrc}" alt="${foundTreasure ? 'Treasure' : 'Hole'}" style="width: 100px; height: auto; margin-bottom: 15px;" />
+          <h3 style="margin: 15px 0; font-size: 24px; color: #333;">
+            ${foundTreasure ? 'Treasure Found!' : 'Missed!'}
+          </h3>
+          <p style="font-size: 18px; color: #666; margin: 10px 0;">
+            Bonus: <strong style="color: #2196F3; font-size: 20px;">$${(lastTrialData.bonusPoints || 0).toFixed(2)}</strong>
+          </p>
+        </div>
+      </div>
+    `;
+  },
+  choices: "NO_KEYS",
+  trial_duration: 2000,
+  data: {
+    trial_type: 'test_feedback'
+  }
+}
+
+// Create a timeline with test trial followed by feedback trial
+const test_trial_with_feedback = {
+  timeline: [test_trial, test_feedback_trial]
+}
+
 const test_trials = {
-  timeline: [test_trial],
+  timeline: [test_trial_with_feedback],
   timeline_variables: selectedTestTrials,
   randomize_order: false
 }
@@ -519,7 +924,7 @@ const test_trials = {
 // Data Saving & Final Trial
 // ============================================
 
-const save_data = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
+const save_data_end = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
   type: jsPsychPipe,
   action: "save",
   experiment_id: EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID,
@@ -541,16 +946,16 @@ const final_trial = {
 const timeline = [
   consent_trial,
   introduction_trial,
-  //exposure_instructions_trial,
-  //exposure_trials,
-  //familiarization_instructions_trial,
-  //familiarization_trials_outer_loop,
+  exposure_instructions_trial,
+  exposure_trials,
+  familiarization_instructions_trial,
+  familiarization_trials_outer_loop,
   test_instructions_trial,
   test_trials
 ];
 
-if (save_data) {
-  timeline.push(save_data);
+if (save_data_end) {
+  timeline.push(save_data_end);
 }
 
 timeline.push(final_trial);

@@ -4,10 +4,10 @@ import csv
 
 n_blocks = 10
 
-HF_count = 2
+HF_count = 4
 LF_count = 1
 
-rep_in_block = 2
+rep_in_block = 1
 
 HF_items = {"blit":15, "grah":60, "clate":195, "noobda":240}
 LF_items = {"pim":105, "gorm":150, "gled":285, "noom":330}
@@ -50,28 +50,36 @@ for block in range(n_blocks):
     foil_sides = ["right" if side == "left" else "left" for side in target_sides]
 
     # Create foils by pairing with different items while maintaining counts
-    foils = [None] * len(targets)
-    available_foils = targets.copy()
-    np.random.shuffle(available_foils)
+    # Use a derangement approach: shuffle targets and ensure no position matches
+    foils = targets.copy()
+    valid_derangement = False
+    max_attempts = 1000
+    attempts = 0
     
-    # Assign foils, ensuring no target-foil matches
-    for i in range(len(targets)):
-        # Find a foil that doesn't match the target at position i
-        for j in range(len(available_foils)):
-            if available_foils[j] != targets[i]:
-                foils[i] = available_foils[j]
-                available_foils.pop(j)
-                break
-        
-        # If we couldn't find a non-matching foil, we need to use a different approach
-        # This happens when all remaining foils match the current target
-        if foils[i] is None:
-            # Use derangement-like approach: swap with a position we can match
-            for j in range(i + 1, len(targets)):
-                if foils[j] is None and available_foils[0] != targets[i]:
-                    foils[i] = available_foils[0]
-                    available_foils.pop(0)
-                    break
+    while not valid_derangement and attempts < max_attempts:
+        np.random.shuffle(foils)
+        # Check that no foil matches its corresponding target
+        valid_derangement = all(foils[i] != targets[i] for i in range(len(targets)))
+        attempts += 1
+    
+    # If we couldn't create a valid derangement, use a fallback approach
+    if not valid_derangement:
+        # Create a list of all unique items from targets
+        unique_items = list(set(targets))
+        foils = []
+        for i, target in enumerate(targets):
+            # Find an item that's different from the target
+            # Prefer items that appear in the target list to maintain frequency distribution
+            candidates = [item for item in targets if item != target]
+            if not candidates:
+                # Fallback: use any item from unique_items that's not the target
+                candidates = [item for item in unique_items if item != target]
+            if candidates:
+                foils.append(np.random.choice(candidates))
+            else:
+                # Last resort: use a random item from all items (shouldn't happen)
+                all_unique = list(set(HF_items.keys()) | set(LF_items.keys()))
+                foils.append(np.random.choice([item for item in all_unique if item != target]))
     
     # Build trial block structure
     block_trials = []

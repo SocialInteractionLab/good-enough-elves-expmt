@@ -4,12 +4,13 @@ import csv
 
 n_orders = 100
 
-HF_count = 2
+HF_count = 4
 LF_count = 1
 
-rep_in_block = 2 #creates the number of trials in each block
+rep_in_block = 1 #creates the number of trials in each block
 near_distance_rep = 3 #sets number of near distance trials in each block
 # for 1:2 this creates N = 72 trials in each ND block
+# for 1:4 this creates N = 60 trials
 
 HF_items = {"blit":15, "grah":60, "clate":195, "noobda":240}
 LF_items = {"pim":105, "gorm":150, "gled":285, "noom":330}
@@ -41,7 +42,8 @@ for block in range(n_orders):
     near_distance_trials = []
 
     for trial_id, target in enumerate(near_distance_targets, 1):
-        angle_offset = np.random.randint(-11, 12)
+        angle_offset_options = np.concatenate([np.arange(-11,0), np.arange(1,12)])
+        angle_offset = int(np.random.choice(angle_offset_options))
         current_angle = all_items[target]["angle"]
         
         if angle_offset > 0:
@@ -111,7 +113,7 @@ for block in range(n_orders):
             # Add 11-22 degrees to angle1, making it the nearest
             # This ensures displayed_angle is 11-22° from angle1
             # No modulo needed since max angle is 330° + 22° = 352° < 360°
-            offset = np.random.randint(11, 23)
+            offset = int(np.random.randint(11, 23))
             displayed_angle = angle1 + offset
             
             # angle1 is guaranteed to be closer since angles are 45° apart
@@ -192,7 +194,7 @@ for block in trial_blocks:
         block_entry["trials"].append(js_trial)
     js_blocks.append(block_entry)
 
-with open(f"stimuli/trial_orders/{LF_count}_{HF_count}_{rep_in_block}_test_trials.js", "w") as f:
+with open(f"stimuli/trial_orders/{LF_count}_{HF_count}_test_trials.js", "w") as f:
     f.write("const test_trials_data = ")
     json.dump(js_blocks, f, indent=4)
     f.write(";\n")
@@ -217,7 +219,7 @@ for block in trial_blocks:
         
         csv_rows.append(base_row)
 
-with open(f"stimuli/trial_orders/{LF_count}_{HF_count}_{rep_in_block}_test_trials.csv", "w", newline="") as f:
+with open(f"stimuli/trial_orders/{LF_count}_{HF_count}_test_trials.csv", "w", newline="") as f:
     fieldnames = ["block_id", "trial_id", "trial_type", "displayed_angle", "nearest_trained_label", 
                   "nearest_trained_angle", "nearest_trained_frequency", "next_nearest_label", 
                   "next_nearest_angle", "is_critical"]
