@@ -128,7 +128,7 @@ for block in trial_blocks:
         })
     js_blocks.append(block_entry)
 
-with open("training_trials.js", "w") as f:
+with open(f"stimuli/trial_orders/{LF_count}_{HF_count}_training_trials.js", "w") as f:
     f.write("const training_trials_data = ")
     json.dump(js_blocks, f, indent=4)
     f.write(";\n")
@@ -150,7 +150,7 @@ for block in trial_blocks:
             "foil_side": trial["foil"]["side"]
         })
 
-with open("training_trials.csv", "w", newline="") as f:
+with open(f"stimuli/trial_orders/{LF_count}_{HF_count}_training_trials.csv", "w", newline="") as f:
     fieldnames = ["block_id", "trial_id", "target_name", "target_frequency", "target_angle", "target_side",
                   "foil_name", "foil_frequency", "foil_angle", "foil_side"]
     writer = csv.DictWriter(f, fieldnames=fieldnames)
