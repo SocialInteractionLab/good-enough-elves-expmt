@@ -9,8 +9,8 @@ LF_count = 1
 
 rep_in_block = 1
 
-HF_items = {"blit":15, "grah":60, "clate":195, "noobda":240}
-LF_items = {"pim":105, "gorm":150, "gled":285, "noom":330}
+HF_items = {"angle_1":15, "angle_2":60, "angle_5":195, "angle_6":240}
+LF_items = {"angle_3":105, "angle_4":150, "angle_7":285, "angle_8":330}
 
 # Create a combined item dictionary with frequency information
 all_items = {}

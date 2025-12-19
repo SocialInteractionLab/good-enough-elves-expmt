@@ -62,6 +62,73 @@ function startExperiment(selectedConfigName) {
   var study_id = jsPsych.data.getURLVariable('STUDY_ID');
   var session_id = jsPsych.data.getURLVariable('SESSION_ID');
 
+  // ============================================
+  // Create random word-to-angle mapping
+  // ============================================
+  
+  // Fixed mapping: angle_id -> angle value (constant, never changes)
+  const angleIdToValue = {
+    'angle_1': 15,
+    'angle_2': 60,
+    'angle_3': 105,
+    'angle_4': 150,
+    'angle_5': 195,
+    'angle_6': 240,
+    'angle_7': 285,
+    'angle_8': 330
+  };
+  
+  // Get the 8 words and shuffle them randomly for this participant
+  const words = angle_label_pairs.map(pair => pair.label);
+  const shuffledWords = jsPsych.randomization.shuffle(words);
+  const angleIds = ['angle_1', 'angle_2', 'angle_3', 'angle_4', 'angle_5', 'angle_6', 'angle_7', 'angle_8'];
+  
+  // Random mapping: angle_id -> word (randomized per participant)
+  const angleIdToWord = {};
+  // Reverse mapping: word -> angle_id
+  const wordToAngleId = {};
+  
+  angleIds.forEach((angleId, index) => {
+    angleIdToWord[angleId] = shuffledWords[index];
+    wordToAngleId[shuffledWords[index]] = angleId;
+  });
+  
+  // Helper function: get angle value from word
+  // word -> angle_id -> angle value
+  const getAngleForWord = (word) => {
+    const angleId = wordToAngleId[word.toLowerCase()];
+    return angleId ? angleIdToValue[angleId] : null;
+  };
+  
+  // Create mapped_angle_label_pairs for exposure/recall trials
+  // Maps each angle value to its randomly assigned word
+  const mapped_angle_label_pairs = angleIds.map(angleId => {
+    const angleValue = angleIdToValue[angleId];
+    const word = angleIdToWord[angleId];
+    // Get frequency from original pairs (frequency is tied to angle position, not word)
+    const originalPair = angle_label_pairs.find(pair => pair.angle === angleValue);
+    return {
+      angle: angleValue,
+      label: word,
+      frequency: originalPair ? originalPair.frequency : 'HF'
+    };
+  });
+  
+  // Store mappings globally for use throughout the experiment
+  window.angleIdToValue = angleIdToValue;
+  window.angleIdToWord = angleIdToWord;
+  window.wordToAngleId = wordToAngleId;
+  window.getAngleForWord = getAngleForWord;
+  window.mapped_angle_label_pairs = mapped_angle_label_pairs;
+  
+  // For backwards compatibility with existing code
+  window.angleToWordMapping = angleIdToWord;
+  
+  // Log the mapping for debugging
+  console.log('Angle ID to Word mapping:', angleIdToWord);
+  console.log('Word to Angle ID mapping:', wordToAngleId);
+  console.log('Mapped angle_label_pairs:', mapped_angle_label_pairs);
+
   jsPsych.data.addProperties({
       subject_id: subject_id,
       prolific_id: prolific_id,
@@ -69,7 +136,8 @@ function startExperiment(selectedConfigName) {
       session_id: session_id,
       experiment_name: EXPERIMENT_CONFIG.EXPERIMENT_NAME,
       experiment_version: EXPERIMENT_CONFIG.EXPERIMENT_VERSION,
-      selected_config: selectedConfigName
+      selected_config: selectedConfigName,
+      angle_mapping: JSON.stringify(angleToWordMapping)
   });
 
   // ============================================
@@ -333,7 +401,7 @@ const exposure_trial = {
 
 const exposure_trials = {
     timeline: [exposure_trial],
-    timeline_variables: angle_label_pairs,
+    timeline_variables: mapped_angle_label_pairs,
     randomize_order: false
 };
 
@@ -381,9 +449,13 @@ const familiarization_trial = {
       // Get trial variables from the timeline_variables (from the JS trial list)
       // leftLabel and rightLabel are set in the trial data and represent the left and right positions
       const angle = jsPsych.evaluateTimelineVariable('angle');
-      const leftLabel = jsPsych.evaluateTimelineVariable('leftLabel'); // Left position label from trial data
-      const rightLabel = jsPsych.evaluateTimelineVariable('rightLabel'); // Right position label from trial data
-      const target = jsPsych.evaluateTimelineVariable('target');
+      // Map angle identifiers to actual words
+      const leftLabelAngleId = jsPsych.evaluateTimelineVariable('leftLabel');
+      const rightLabelAngleId = jsPsych.evaluateTimelineVariable('rightLabel');
+      const targetAngleId = jsPsych.evaluateTimelineVariable('target');
+      const leftLabel = angleToWordMapping[leftLabelAngleId] || leftLabelAngleId;
+      const rightLabel = angleToWordMapping[rightLabelAngleId] || rightLabelAngleId;
+      const target = angleToWordMapping[targetAngleId] || targetAngleId;
       const compassHTML = createCompassHTML(angle);
 
       return `
@@ -409,10 +481,14 @@ const familiarization_trial = {
       trial_type: 'familiarization'
     },
     on_finish: function(data) {
-      const target = jsPsych.evaluateTimelineVariable('target');
+      // Map angle identifiers to actual words
+      const targetAngleId = jsPsych.evaluateTimelineVariable('target');
+      const target = angleToWordMapping[targetAngleId] || targetAngleId;
       const angle = jsPsych.evaluateTimelineVariable('angle');
-      const leftLabel = jsPsych.evaluateTimelineVariable('leftLabel');
-      const rightLabel = jsPsych.evaluateTimelineVariable('rightLabel');
+      const leftLabelAngleId = jsPsych.evaluateTimelineVariable('leftLabel');
+      const rightLabelAngleId = jsPsych.evaluateTimelineVariable('rightLabel');
+      const leftLabel = angleToWordMapping[leftLabelAngleId] || leftLabelAngleId;
+      const rightLabel = angleToWordMapping[rightLabelAngleId] || rightLabelAngleId;
       const trial_id = jsPsych.evaluateTimelineVariable('trial_id');
       const response = data.response['familiarization-response'].toLowerCase().trim();
       const isCorrect = response === target.toLowerCase();
@@ -624,7 +700,7 @@ const recall_trial = {
 
 const recall_trials = {
   timeline: [recall_trial],
-  timeline_variables: angle_label_pairs,
+  timeline_variables: mapped_angle_label_pairs,
   randomize_order: true,
   on_timeline_start: function() {
     recall_state.current_iteration_trials = [];
@@ -637,31 +713,15 @@ const recall_trials = {
 }
 
 // Message trial showing "Saving your data and checking answers. Please do not close this page."
-const saving_message_trial = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: `
-    <div class="instruction-text">
-      <h2>Saving your data and checking answers.</h2>
-      <p>Please do not close this page.</p>
-    </div>
-  `,
-  choices: "NO_KEYS",
-  trial_duration: 2000, // Show for 2 seconds while saving
-  data: {
-    trial_type: 'saving_message'
-  },
-  on_finish: function(data) {
-    data.recall_iteration = recall_state.outer_loop_iteration;
-  }
-};
 
 // Data saving trial after each recall test
 const save_data_recall = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
   type: jsPsychPipe,
   action: "save",
   experiment_id: EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID,
-  filename: `training_${filename}`,
+  filename: `inprog_${recall_state.outer_loop_iteration}_${filename}`,
   data_string: () => jsPsych.data.get().csv(),
+  wait_message: "Saving your data and checking answers. Please do not close this page.",
   data: {
     trial_type: 'save_data_recall'
   },
@@ -675,7 +735,7 @@ const continue_after_save_trial = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: function() {
     // Calculate recall performance
-    const expectedTrialCount = angle_label_pairs.length;
+    const expectedTrialCount = mapped_angle_label_pairs.length;
     const recallTrials = recall_state.current_iteration_trials;
     const totalRecallTrials = recallTrials.length;
     const correctRecallTrials = recallTrials.filter(trial => trial.is_correct === 1).length;
@@ -703,7 +763,7 @@ const continue_after_save_trial = {
   },
   on_finish: function(data) {
     // Store recall performance data
-    const expectedTrialCount = angle_label_pairs.length;
+    const expectedTrialCount = mapped_angle_label_pairs.length;
     const recallTrials = recall_state.current_iteration_trials;
     const totalRecallTrials = recallTrials.length;
     const correctRecallTrials = recallTrials.filter(trial => trial.is_correct === 1).length;
@@ -720,7 +780,6 @@ const continue_after_save_trial = {
 // Build the timeline for saving after recall
 const save_after_recall_timeline = [];
 if (EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID) {
-  save_after_recall_timeline.push(saving_message_trial);
   if (save_data_recall) {
     save_after_recall_timeline.push(save_data_recall);
   }
@@ -739,7 +798,7 @@ const familiarization_trials_outer_loop = {
     console.log(`[OUTER LOOP] Starting iteration ${recall_state.outer_loop_iteration}`);
   },
   loop_function: function(data) {
-    const expectedTrialCount = angle_label_pairs.length;
+    const expectedTrialCount = mapped_angle_label_pairs.length;
     const recallTrials = recall_state.current_iteration_trials;
     
     const totalRecallTrials = recallTrials.length;
@@ -887,8 +946,13 @@ function angularDistance(a1, a2) {
 
 // Helper function to find angle for a given label
 function findAngleForLabel(label) {
-  const pair = angle_label_pairs.find(p => p.label.toLowerCase() === label.toLowerCase());
-  return pair ? pair.angle : null;
+  // Use the global getAngleForWord function if available
+  if (window.getAngleForWord) {
+    return window.getAngleForWord(label);
+  }
+  // Fallback to original angle_label_pairs if mapping not available yet
+  const originalPair = angle_label_pairs.find(p => p.label.toLowerCase() === label.toLowerCase());
+  return originalPair ? originalPair.angle : null;
 }
 
 // Helper function to calculate bonus points based on distance
@@ -986,7 +1050,9 @@ const test_trial = {
   type: jsPsychSurveyHtmlForm,
   html: function() {
     const angle = jsPsych.evaluateTimelineVariable('angle');
-    const label = jsPsych.evaluateTimelineVariable('label');
+    // Map angle identifier to actual word
+    const labelAngleId = jsPsych.evaluateTimelineVariable('label');
+    const label = angleToWordMapping[labelAngleId] || labelAngleId;
     const compassHTML = createCompassHTML(angle);
     return `
       <div class="compass-container" style="display: flex; align-items: flex-start; justify-content: center; gap: 40px; max-width: 1000px; margin: 0 auto;">
@@ -1095,11 +1161,14 @@ const test_trial = {
     // Update trial counter
     updateTrialCounter();
     
-    const label = jsPsych.evaluateTimelineVariable('label');
+    // Map angle identifiers to actual words
+    const labelAngleId = jsPsych.evaluateTimelineVariable('label');
+    const label = angleToWordMapping[labelAngleId] || labelAngleId;
     const angle = jsPsych.evaluateTimelineVariable('angle');
     const trialId = jsPsych.evaluateTimelineVariable('trial_id');
     const nearestTrainedAngle = jsPsych.evaluateTimelineVariable('nearest_trained_angle');
-    const nextNearestLabel = jsPsych.evaluateTimelineVariable('next_nearest_label');
+    const nextNearestLabelAngleId = jsPsych.evaluateTimelineVariable('next_nearest_label');
+    const nextNearestLabel = angleToWordMapping[nextNearestLabelAngleId] || nextNearestLabelAngleId;
     const nextNearestAngle = jsPsych.evaluateTimelineVariable('next_nearest_angle');
     const trialType = jsPsych.evaluateTimelineVariable('trial_type');
     const isCritical = jsPsych.evaluateTimelineVariable('is_critical');

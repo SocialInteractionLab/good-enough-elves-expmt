@@ -7,13 +7,15 @@ n_orders = 100
 HF_count = 4
 LF_count = 1
 
-rep_in_block = 1 #creates the number of trials in each block
-near_distance_rep = 3 #sets number of near distance trials in each block
-# for 1:2 this creates N = 72 trials in each ND block
-# for 1:4 this creates N = 60 trials
+rep_in_block = 3 #creates the number of trials in each block 
+# 2 for 1:2, 3 for 1:4
+near_distance_rep = 1 #sets number of near distance trials in each block
+# 1 for 1:2, 3 for 1:4
+# for 1:2 this creates N = 72 near distance trials in each ND block, 136 trials total
+# for 1:4 this creates N = 60 near distance trials in each ND block, 124 trials total
 
-HF_items = {"blit":15, "grah":60, "clate":195, "noobda":240}
-LF_items = {"pim":105, "gorm":150, "gled":285, "noom":330}
+HF_items = {"angle_1":15, "angle_2":60, "angle_5":195, "angle_6":240}
+LF_items = {"angle_3":105, "angle_4":150, "angle_7":285, "angle_8":330}
 
 # Create a combined item dictionary with frequency information
 all_items = {}
@@ -79,22 +81,22 @@ for block in range(n_orders):
     # Define all angle pairs (adjacent angles on the compass)
     # Format: (angle1, angle2, item1, item2, is_critical)
     angle_pairs = [
-        (15, 60, "blit", "grah", False),  # HF-HF
-        (60, 15, "grah", "blit", False),  # HF-HF
-        (60, 105, "grah", "pim", True),   # HF-LF (critical)
-        (105, 60, "pim", "grah", True),   # HF-LF (critical)
-        (105, 150, "pim", "gorm", False), # LF-LF
-        (150, 105, "gorm", "pim", False), # LF-LF
-        (150, 195, "gorm", "clate", True), # LF-HF (critical)
-        (195, 150, "clate", "gorm", True), # LF-HF (critical)
-        (195, 240, "clate", "noobda", False), # HF-HF
-        (240, 195, "noobda", "clate", False), # HF-HF
-        (240, 285, "noobda", "gled", True), # HF-LF (critical)
-        (285, 240, "gled", "noobda", True), # HF-LF (critical)
-        (285, 330, "gled", "noom", False), # LF-LF
-        (330, 285, "noom", "gled", False), # LF-LF
-        (330, 15, "noom", "blit", False), # LF-HF
-        (15, 330, "blit", "noom", False), # LF-HF
+        (15, 60, "angle_1", "angle_2", False),  # HF-HF
+        (60, 15, "angle_2", "angle_1", False),  # HF-HF
+        (60, 105, "angle_2", "angle_3", True),   # HF-LF (critical)
+        (105, 60, "angle_3", "angle_2", True),   # HF-LF (critical)
+        (105, 150, "angle_3", "angle_4", False), # LF-LF
+        (150, 105, "angle_4", "angle_3", False), # LF-LF
+        (150, 195, "angle_4", "angle_5", True), # LF-HF (critical)
+        (195, 150, "angle_5", "angle_4", True), # LF-HF (critical)
+        (195, 240, "angle_5", "angle_6", False), # HF-HF
+        (240, 195, "angle_6", "angle_5", False), # HF-HF
+        (240, 285, "angle_6", "angle_7", True), # HF-LF (critical)
+        (285, 240, "angle_7", "angle_6", True), # HF-LF (critical)
+        (285, 330, "angle_7", "angle_8", False), # LF-LF
+        (330, 285, "angle_8", "angle_7", False), # LF-LF
+        (330, 15, "angle_8", "angle_1", False), # LF-HF
+        (15, 330, "angle_1", "angle_8", False), # LF-HF
     ]
     
     far_distance_trials = []
