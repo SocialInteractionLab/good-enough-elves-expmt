@@ -2,7 +2,7 @@
 const EXPERIMENT_CONFIG = {
   // Prolific completion code (same for all participants)
 
-  PROLIFIC_COMPLETION_CODE: 'CPWND8YD',
+  PROLIFIC_COMPLETION_CODE: 'C1G4BSWV',
   
   // 5. Set the experiment ID below:
   DATAPIPE_EXPERIMENT_ID: 'XnWHnqtEu5Et', 
