@@ -719,7 +719,7 @@ const save_data_recall = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
   type: jsPsychPipe,
   action: "save",
   experiment_id: EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID,
-  filename: `inprog_${recall_state.outer_loop_iteration}_${filename}`,
+  filename: () => `inprog_${recall_state.outer_loop_iteration}_${filename}`,
   data_string: () => jsPsych.data.get().csv(),
   wait_message: "Saving your data and checking answers. Please do not close this page.",
   data: {
@@ -884,7 +884,8 @@ let totalTestTrials = 0;
 
 // Function to initialize the points display at the top of the screen
 function initializePointsDisplay() {
-  totalTestTrials = selectedTestTrials.length;
+  // Include both main test trials and exact angle test trials (8 additional)
+  totalTestTrials = selectedTestTrials.length + mapped_angle_label_pairs.length;
   currentTrialNumber = 0;
   
   const pointsDisplay = document.createElement('div');
@@ -1321,7 +1322,7 @@ const test_feedback_trial = {
     `;
   },
   choices: "NO_KEYS",
-  trial_duration: 2000,
+  trial_duration: EXPERIMENT_CONFIG.TEST_FEEDBACK_TIME * 1000,
   data: {
     trial_type: 'test_feedback'
   }
@@ -1368,6 +1369,310 @@ const test_trials = {
 }
 
 // ============================================
+// Phase 6.5: Exact Angle Test Trials
+// ============================================
+
+const exact_angle_test_instructions_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div class="instruction-text">
+      <h2>Final Treasure Hunt Round</h2>
+      <p>Great job so far! Now for one final round of treasure hunting.</p>
+      <p>In this round, you'll be guiding the Elves to the exact directions you learned.</p>
+      <p>You'll have <span class="test-time">${EXPERIMENT_CONFIG.TEST_TIME}</span> seconds to give each direction. The closer you are to the correct answer, the larger your bonus!</p>
+      <p>Press any key to begin.</p>
+    </div>
+  `,
+  choices: 'ALL_KEYS',
+  data: {
+    trial_type: 'exact_angle_test_instructions'
+  }
+}
+
+// Generate exact angle test trial variables from mapped_angle_label_pairs
+// These use the exact trained angles (15, 60, 105, 150, 195, 240, 285, 330)
+const exact_angle_test_trial_variables = mapped_angle_label_pairs.map((pair, index) => ({
+  trial_id: `exact_${index + 1}`,
+  angle: pair.angle,
+  label: pair.label,  // Already the actual word, not angle_id
+  nearest_trained_angle: pair.angle,  // Same as angle for exact test
+  next_nearest_label: null,
+  next_nearest_angle: null,
+  trial_type: 'exact_angle',
+  is_critical: true,
+  targetFreq: pair.frequency
+}));
+
+// Store timeout timer reference for exact angle test
+let exactTestTrialTimeout = null;
+let exactTestTrialCountdownInterval = null;
+let exactCurrentTrialTimedOut = false;
+
+const exact_angle_test_trial = {
+  type: jsPsychSurveyHtmlForm,
+  html: function() {
+    const angle = jsPsych.evaluateTimelineVariable('angle');
+    const compassHTML = createCompassHTML(angle);
+    return `
+      <div class="compass-container" style="display: flex; align-items: flex-start; justify-content: center; gap: 40px; max-width: 1000px; margin: 0 auto;">
+        <div style="flex: 0 0 auto; width: 300px;">
+          ${compassHTML}    
+          <p class="compass-instruction">What is this direction called?</p>
+          <div id="exact-test-countdown" style="
+            text-align: center;
+            font-size: 16px;
+            font-weight: normal;
+            color: #666;
+            margin: 10px 0;
+            min-height: 25px;
+          "></div>
+          <input type="text" id="exact-test-response" name="exact-test-response" class="compass-input" autocomplete="off" autofocus />
+        </div>
+        <div style="flex: 0 0 300px; min-height: 300px;">
+          <!-- Placeholder to keep compass in same position -->
+        </div>
+      </div>
+    `;
+  },
+  autofocus: 'exact-test-response',
+  data: {
+    trial_type: 'exact_angle_test'
+  },
+  on_load: function() {
+    // Reset timeout flag for new trial
+    exactCurrentTrialTimedOut = false;
+    
+    // Clear any existing timeout and countdown interval
+    if (exactTestTrialTimeout) {
+      clearTimeout(exactTestTrialTimeout);
+      exactTestTrialTimeout = null;
+    }
+    if (exactTestTrialCountdownInterval) {
+      clearInterval(exactTestTrialCountdownInterval);
+      exactTestTrialCountdownInterval = null;
+    }
+    
+    // Initialize countdown display
+    const countdownElement = document.getElementById('exact-test-countdown');
+    const totalSeconds = EXPERIMENT_CONFIG.TEST_TIME;
+    let remainingSeconds = totalSeconds;
+    
+    // Update countdown display immediately
+    if (countdownElement) {
+      countdownElement.textContent = `Time remaining: ${remainingSeconds}s`;
+    }
+    
+    // Update countdown every second
+    exactTestTrialCountdownInterval = setInterval(function() {
+      remainingSeconds--;
+      if (countdownElement) {
+        if (remainingSeconds > 0) {
+          countdownElement.textContent = `Time remaining: ${remainingSeconds}s`;
+        } else {
+          countdownElement.textContent = 'Time\'s up!';
+        }
+      }
+    }, 1000);
+    
+    // Start timer
+    const timeoutMs = EXPERIMENT_CONFIG.TEST_TIME * 1000;
+    exactTestTrialTimeout = setTimeout(function() {
+      // Clear countdown interval
+      if (exactTestTrialCountdownInterval) {
+        clearInterval(exactTestTrialCountdownInterval);
+        exactTestTrialCountdownInterval = null;
+      }
+      
+      // Timeout expired - mark trial as timed out and finish it
+      exactCurrentTrialTimedOut = true;
+      const form = document.querySelector('#jspsych-survey-html-form');
+      if (form) {
+        const inputField = form.querySelector('#exact-test-response');
+        if (inputField) {
+          inputField.value = '';
+        }
+        const submitButton = form.querySelector('input[type="submit"]');
+        if (submitButton) {
+          submitButton.click();
+        } else {
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }
+    }, timeoutMs);
+  },
+  on_finish: function(data) {
+    // Clear the timeout and countdown interval
+    if (exactTestTrialTimeout) {
+      clearTimeout(exactTestTrialTimeout);
+      exactTestTrialTimeout = null;
+    }
+    if (exactTestTrialCountdownInterval) {
+      clearInterval(exactTestTrialCountdownInterval);
+      exactTestTrialCountdownInterval = null;
+    }
+    
+    const timedOut = exactCurrentTrialTimedOut;
+    
+    // Update trial counter
+    updateTrialCounter();
+    
+    // Get trial variables - label is already the actual word for exact angle trials
+    const label = jsPsych.evaluateTimelineVariable('label');
+    const angle = jsPsych.evaluateTimelineVariable('angle');
+    const trialId = jsPsych.evaluateTimelineVariable('trial_id');
+    const trialType = jsPsych.evaluateTimelineVariable('trial_type');
+    const isCritical = jsPsych.evaluateTimelineVariable('is_critical');
+    const targetFreq = jsPsych.evaluateTimelineVariable('targetFreq');
+    
+    const responseValue = (data.response && data.response['exact-test-response']) || '';
+    const response = responseValue.toLowerCase ? responseValue.toLowerCase().trim() : '';
+    const labelLower = label ? label.toLowerCase() : '';
+    const isCorrect = response === labelLower ? 1 : 0;
+    
+    let enteredAngle = null;
+    let bonusPoints = 0;
+    let distanceToTreasure = null;
+    
+    if (timedOut) {
+      bonusPoints = 0;
+    } else {
+      enteredAngle = findAngleForLabel(response);
+      bonusPoints = calculateBonusPoints(enteredAngle, angle);
+      distanceToTreasure = enteredAngle !== null 
+        ? angularDistance(enteredAngle, angle) 
+        : null;
+    }
+    
+    // Debug logging
+    console.log('=== Exact Angle Test Trial Debug ===');
+    console.log('Trial ID:', trialId);
+    console.log('Timed out:', timedOut);
+    console.log('Entered response:', response);
+    console.log('Target label:', label);
+    console.log('Tested angle (exact):', angle);
+    console.log('Entered angle:', enteredAngle !== null ? enteredAngle : 'NOT FOUND');
+    console.log('Distance from target:', distanceToTreasure !== null ? distanceToTreasure + ' degrees' : 'N/A');
+    console.log('Bonus points:', bonusPoints);
+    console.log('====================================');
+    
+    // Update total points display
+    updatePointsDisplay(bonusPoints);
+    
+    // Store trial data for feedback trial
+    lastTrialData = {
+      angle: angle,
+      label: label,
+      response: response,
+      enteredAngle: enteredAngle,
+      bonusPoints: bonusPoints,
+      distanceToTreasure: distanceToTreasure,
+      isCorrect: isCorrect,
+      trialId: trialId,
+      nearestTrainedAngle: angle,
+      nextNearestLabel: null,
+      nextNearestAngle: null,
+      trialType: trialType,
+      isCritical: isCritical,
+      targetFreq: targetFreq,
+      timedOut: timedOut
+    };
+    
+    data.is_correct = isCorrect;
+    data.response_text = response;
+    data.target = label;
+    data.angle = angle;
+    data.trial_id = trialId;
+    data.nearest_trained_angle = angle;
+    data.trial_type = trialType;
+    data.is_critical = isCritical;
+    data.targetFreq = targetFreq;
+    data.bonus_points = bonusPoints;
+    data.distance_to_treasure = distanceToTreasure;
+    data.entered_angle = enteredAngle;
+    data.total_points = totalPoints;
+    data.timed_out = timedOut ? 1 : 0;
+  }
+}
+
+// Exact angle test trial with feedback (reuses the test_feedback_trial)
+const exact_angle_test_trial_with_feedback = {
+  timeline: [exact_angle_test_trial, test_feedback_trial]
+}
+
+const exact_angle_test_trials = {
+  timeline: [exact_angle_test_trial_with_feedback],
+  timeline_variables: exact_angle_test_trial_variables,
+  randomize_order: true
+}
+
+// ============================================
+// Phase 6.6: Final Untimed Recall Trials
+// ============================================
+
+const final_recall_instructions_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div class="instruction-text">
+      <h2>Final Recall Check</h2>
+      <p>Great work on the treasure hunt! Before we finish, we'd like to check how well you remember the Elvish directions.</p>
+      <p>You'll see each direction one more time. Take your time - there's no time limit for this section.</p>
+      <p>Press any key to begin.</p>
+    </div>
+  `,
+  choices: 'ALL_KEYS',
+  data: {
+    trial_type: 'final_recall_instructions'
+  },
+  on_finish: function() {
+    // Hide the points display for final recall (since there's no scoring)
+    const pointsDisplay = document.getElementById('total-points-display');
+    if (pointsDisplay) {
+      pointsDisplay.style.display = 'none';
+    }
+    document.body.style.paddingTop = '0px';
+  }
+}
+
+const final_recall_trial = {
+  type: jsPsychSurveyHtmlForm,
+  html: function() {
+    const angle = jsPsych.evaluateTimelineVariable('angle');
+    const label = jsPsych.evaluateTimelineVariable('label');
+    const compassHTML = createCompassHTML(angle);
+    return `
+      <div class="compass-container">
+        ${compassHTML}
+        <p class="compass-instruction">What is this direction called?</p>
+        <input type="text" id="final-recall-response" name="final-recall-response" class="compass-input" autocomplete="off" autofocus />
+      </div>
+    `;
+  },
+  autofocus: 'final-recall-response',
+  data: {
+    trial_type: 'final_recall'
+  },
+  on_finish: function(data) {
+    const label = jsPsych.evaluateTimelineVariable('label');
+    const angle = jsPsych.evaluateTimelineVariable('angle');
+    const frequency = jsPsych.evaluateTimelineVariable('frequency');
+    const response = data.response['final-recall-response'].toLowerCase().trim();
+    const isCorrect = response === label.toLowerCase() ? 1 : 0;
+    
+    data.is_correct = isCorrect;
+    data.response_text = response;
+    data.target = label;
+    data.angle = angle;
+    data.targetFreq = frequency;
+  }
+}
+
+const final_recall_trials = {
+  timeline: [final_recall_trial],
+  timeline_variables: mapped_angle_label_pairs,
+  randomize_order: true
+}
+
+// ============================================
 // Phase 7: Exit Survey
 // ============================================
 
@@ -1395,6 +1700,36 @@ const survey_trial = {
       
       <p><label>Any additional comments or feedback?</label><br/>
       <textarea name="comments" rows="4" cols="50" style="width: 100%;"></textarea></p>
+      
+      <hr style="margin: 30px 0; border: none; border-top: 1px solid #ccc;" />
+      
+      <h3 style="margin-bottom: 15px;">Demographics (Optional)</h3>
+      <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+        <em>The following questions are optional. Leave blank if you prefer not to answer.</em>
+      </p>
+      
+      <p><label>What is your age?</label><br/>
+      <input type="number" name="age" min="18" max="120" placeholder="Enter your age" style="width: 150px; padding: 8px; font-size: 16px;" /></p>
+      
+      <p><label>What is your gender?</label><br/>
+      <input type="text" name="gender" placeholder="Enter your gender" style="width: 200px; padding: 8px; font-size: 16px;" /></p>
+      
+      <hr style="margin: 30px 0; border: none; border-top: 1px solid #ccc;" />
+      
+      <h3 style="margin-bottom: 15px;">Research Integrity</h3>
+      <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+        <em>This is a scientific research study, and we need to know which responses come from human participants without AI assistance. <strong>Your answer will NOT affect your compensation in any way</strong> — you will receive full payment regardless of your response. However, honest answers are essential for the integrity of our research.</em>
+      </p>
+      
+      <p><label>Did you use any AI tools (such as ChatGPT, Google Bard, Claude, or any other AI assistants) to help you during this experiment?</label><br/>
+      <select name="ai_usage" required style="padding: 8px; font-size: 16px; width: 100%; max-width: 400px; margin-top: 5px;">
+        <option value="">-- Please select --</option>
+        <option value="no">No, I did not use any AI tools</option>
+        <option value="yes">Yes, I used AI tools</option>
+      </select></p>
+      
+      <p><label>If you used AI tools, please briefly describe how (optional):</label><br/>
+      <textarea name="ai_usage_description" rows="3" cols="50" style="width: 100%;" placeholder="Leave blank if you did not use AI"></textarea></p>
     </div>
   `,
   data: {
@@ -1407,41 +1742,12 @@ const survey_trial = {
     data.survey_study_purpose = data.response.study_purpose || '';
     data.survey_learning_strategies = data.response.learning_strategies || '';
     data.survey_comments = data.response.comments || '';
-  }
-};
-
-// ============================================
-// Phase 8: Demographics Survey (Optional)
-// ============================================
-
-const demographics_trial = {
-  type: jsPsychSurveyHtmlForm,
-  preamble: `
-    <div class="instruction-text">
-      <h2>Demographics (Optional)</h2>
-      <p>The following questions are optional. You may skip any question you prefer not to answer.</p>
-    </div>
-  `,
-  html: `
-    <div style="text-align: left; max-width: 600px; margin: 0 auto;">
-      <p><label>What is your age?</label><br/>
-      <input type="number" name="age" min="18" max="120" placeholder="Enter your age" style="width: 150px; padding: 8px; font-size: 16px;" /></p>
-      
-      <p><label>What is your gender?</label><br/>
-      <input type="text" name="gender" placeholder="Enter your gender" style="width: 200px; padding: 8px; font-size: 16px;" /></p>
-      
-      <p style="margin-top: 10px; font-size: 14px; color: #666;">
-        <em>Note: These questions are completely optional. Leave blank if you prefer not to answer.</em>
-      </p>
-    </div>
-  `,
-  data: {
-    trial_type: 'demographics'
-  },
-  on_finish: function(data) {
     // Store demographics responses (may be empty strings if not answered)
     data.demographics_age = data.response.age || '';
     data.demographics_gender = data.response.gender || '';
+    // Store AI usage self-report
+    data.ai_usage = data.response.ai_usage || '';
+    data.ai_usage_description = data.response.ai_usage_description || '';
   }
 };
 
@@ -1478,8 +1784,10 @@ const timeline = [
   familiarization_trials_outer_loop,
   test_instructions_trial,
   test_trials,
-  survey_trial,
-  demographics_trial
+  exact_angle_test_trials,
+  final_recall_instructions_trial,
+  final_recall_trials,
+  survey_trial
 ];
 
 if (save_data_end) {

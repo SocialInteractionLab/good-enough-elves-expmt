@@ -22,7 +22,7 @@ const EXPERIMENT_CONFIG = {
   
   // Test trial time limit (in seconds)
   TEST_TIME: 5, // Time limit for test trials
-  TEST_FEEDBACK_TIME: 1, // Time limit for test feedback trials
+  TEST_FEEDBACK_TIME: .5, // Time limit for test feedback trials
   
   // Test trial break interval
   TEST_BREAK_INTERVAL: 40, // Show break after every N test trials
