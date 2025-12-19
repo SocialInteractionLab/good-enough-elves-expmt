@@ -31,8 +31,8 @@ const EXPERIMENT_CONFIG = {
   POINT_TO_BONUS_SCALE: .001, //1 point = $0.01
   // Training trial order file path
   // Set this to match the trial order file you want to use
-  TRAINING_TRIALS_PATH: 'stimuli/trial_orders/1_2_training_trials.js',
-  TEST_TRIALS_PATH: 'stimuli/trial_orders/1_2_2_test_trials.js'
+  TRAINING_TRIALS_PATH: 'stimuli/trial_orders/1_4_training_trials.js',
+  TEST_TRIALS_PATH: 'stimuli/trial_orders/1_4_test_trials.js'
 };
 
 // Set angle and label pairings for all participants 
