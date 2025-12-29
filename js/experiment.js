@@ -137,6 +137,8 @@ function startExperiment(selectedConfigName) {
       experiment_name: EXPERIMENT_CONFIG.EXPERIMENT_NAME,
       experiment_version: EXPERIMENT_CONFIG.EXPERIMENT_VERSION,
       selected_config: selectedConfigName,
+      frequency_ratio: EXPERIMENT_CONFIG.FREQUENCY_RATIO,
+      time_pressure: EXPERIMENT_CONFIG.TIME_PRESSURE,
       angle_mapping: JSON.stringify(angleToWordMapping)
   });
 
@@ -384,12 +386,14 @@ const exposure_trial = {
         on_finish: function(data) {
             const target = jsPsych.evaluateTimelineVariable('label');
             const angle = jsPsych.evaluateTimelineVariable('angle');
+            const frequency = jsPsych.evaluateTimelineVariable('frequency');
             const response = data.response['exposure-response'].toLowerCase().trim();
             
             data.is_correct = response === target.toLowerCase() ? 1 : 0;
             data.response_text = response;
             data.target = target;
             data.angle = angle;
+            data.targetFreq = frequency;
         }
     }],
     autofocus: 'exposure-response',
@@ -537,10 +541,15 @@ const familiarization_trial = {
         audio.play().catch(e => console.log('Audio play failed:', e));
       }
       
+      // Look up frequency for the target angle
+      const targetPair = mapped_angle_label_pairs.find(p => p.angle === angle);
+      const frequency = targetPair ? targetPair.frequency : null;
+      
       data.is_correct = isCorrect ? 1 : 0;
       data.response_text = response;
       data.target = target;
       data.angle = angle;
+      data.targetFreq = frequency;
       data.leftLabel = leftLabel;
       data.rightLabel = rightLabel;
       data.trial_id = trial_id;
@@ -679,6 +688,7 @@ const recall_trial = {
   on_finish: function(data) {
     const label = jsPsych.evaluateTimelineVariable('label');
     const angle = jsPsych.evaluateTimelineVariable('angle');
+    const frequency = jsPsych.evaluateTimelineVariable('frequency');
     const response = data.response['recall-response'].toLowerCase().trim();
     const isCorrect = response === label.toLowerCase() ? 1 : 0;
     
@@ -686,6 +696,7 @@ const recall_trial = {
     data.response_text = response;
     data.target = label;
     data.angle = angle;
+    data.targetFreq = frequency;
     data.outer_loop_iteration = recall_state.outer_loop_iteration;
     data.recall_trial_number = recall_state.trial_number;
     

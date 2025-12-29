@@ -5,11 +5,15 @@ const EXPERIMENT_CONFIG = {
   PROLIFIC_COMPLETION_CODE: 'C1G4BSWV',
   
   // 5. Set the experiment ID below:
-  DATAPIPE_EXPERIMENT_ID: 'XnWHnqtEu5Et', 
+  DATAPIPE_EXPERIMENT_ID: 'le4EEEMTljIn', 
   
   // Experiment settings
   EXPERIMENT_NAME: 'elves_treasure_hunt',
   EXPERIMENT_VERSION: '1.0.0',
+  
+  // Condition parameters (for analysis)
+  FREQUENCY_RATIO: '1:2',  // Ratio of HF to LF during training (1:2 or 1:4)
+  TIME_PRESSURE: 10,       // Time limit in seconds for test trials (5 or 10)
   
   // Timing constants (in milliseconds)
   ITI: 500, // Inter-trial interval
