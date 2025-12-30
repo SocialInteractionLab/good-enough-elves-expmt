@@ -5,7 +5,7 @@ const EXPERIMENT_CONFIG = {
   PROLIFIC_COMPLETION_CODE: 'C1G4BSWV',
   
   // 5. Set the experiment ID below:
-  DATAPIPE_EXPERIMENT_ID: 'le4EEEMTljIn', 
+  DATAPIPE_EXPERIMENT_ID: 'o4nUmcwaw50b', 
   
   // Experiment settings
   EXPERIMENT_NAME: 'elves_treasure_hunt',
