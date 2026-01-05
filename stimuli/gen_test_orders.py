@@ -9,7 +9,7 @@ LF_count = 1
 
 rep_in_block = 3 #creates the number of trials in each block 
 # 2 for 1:2, 3 for 1:4
-near_distance_rep = 1 #sets number of near distance trials in each block
+near_distance_rep = 3 #sets number of near distance trials in each block
 # 1 for 1:2, 3 for 1:4
 # for 1:2 this creates N = 72 near distance trials in each ND block, 136 trials total
 # for 1:4 this creates N = 60 near distance trials in each ND block, 124 trials total
@@ -49,9 +49,9 @@ for block in range(n_orders):
         current_angle = all_items[target]["angle"]
         
         if angle_offset > 0:
-            next_nearest_angle = (current_angle - 45) % 360
+            next_nearest_angle = (current_angle + 45) % 360  # offset positive → angle above current → next nearest is above
         else:
-            next_nearest_angle = (current_angle + 45) % 360
+            next_nearest_angle = (current_angle - 45) % 360  # offset negative → angle below current → next nearest is below
         
         # Find the item with the matching angle
         next_nearest_label = [item for item, data in all_items.items() if data["angle"] == next_nearest_angle][0]
@@ -112,11 +112,20 @@ for block in range(n_orders):
     # and 23-34° from angle2, so angle1 is clearly closer (by at least 2°)
     for angle1, angle2, item1, item2, is_critical in angle_pairs:
         for _ in range(4):
-            # Add 11-22 degrees to angle1, making it the nearest
-            # This ensures displayed_angle is 11-22° from angle1
-            # No modulo needed since max angle is 330° + 22° = 352° < 360°
-            offset = int(np.random.randint(11, 23))
-            displayed_angle = angle1 + offset
+            # Determine offset direction: positive if angle2 is clockwise from angle1, negative otherwise
+            # Clockwise distance = (angle2 - angle1) % 360
+            # If <= 180, it's clockwise (use positive offset); if > 180, it's counter-clockwise (use negative offset)
+            clockwise_dist = (angle2 - angle1) % 360
+            offset_magnitude = int(np.random.randint(11, 23))
+            
+            if clockwise_dist <= 180:
+                # angle2 is clockwise from angle1, use positive offset
+                offset = offset_magnitude
+            else:
+                # angle2 is counter-clockwise from angle1, use negative offset
+                offset = -offset_magnitude
+            
+            displayed_angle = (angle1 + offset) % 360
             
             # angle1 is guaranteed to be closer since angles are 45° apart
             # (displayed_angle is 11-22° from angle1, so 23-34° from angle2)
