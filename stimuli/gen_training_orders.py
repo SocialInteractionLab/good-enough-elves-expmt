@@ -4,10 +4,34 @@ import csv
 
 n_blocks = 10
 
-HF_count = 4
-LF_count = 1
+# =============================================================================
+# CONDITION SETTINGS - Choose ONE of the following configurations:
+# =============================================================================
+# For 1:2 ratio (24 trials per block):
+#   HF_count = 2, LF_count = 1, rep_in_block = 2
+#   Each HF angle: 4 appearances, Each LF angle: 2 appearances (ratio 2:1)
+#   Total: 16 HF + 8 LF = 24 trials per block
+#
+# For 1:4 ratio (20 trials per block):
+#   HF_count = 4, LF_count = 1, rep_in_block = 1
+#   Each HF angle: 4 appearances, Each LF angle: 1 appearance (ratio 4:1)
+#   Total: 16 HF + 4 LF = 20 trials per block
+#
+# Note: Both ratios have the same number of HF targets (16 per block).
+# The difference is only in LF targets (8 vs 4), which is expected given the ratio.
+# =============================================================================
 
-rep_in_block = 1
+# --- 1:2 ratio settings ---
+# Produces: 24 trials per block (16 HF + 8 LF)
+HF_count = 2
+LF_count = 1
+rep_in_block = 2
+
+# --- 1:4 ratio settings (uncomment to use) ---
+# Produces: 20 trials per block (16 HF + 4 LF)
+# HF_count = 4
+# LF_count = 1
+# rep_in_block = 1
 
 HF_items = {"angle_1":15, "angle_2":60, "angle_5":195, "angle_6":240}
 LF_items = {"angle_3":105, "angle_4":150, "angle_7":285, "angle_8":330}

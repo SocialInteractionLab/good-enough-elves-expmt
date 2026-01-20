@@ -1,5 +1,62 @@
 // Main Experiment Script
 
+// ============================================
+// EXPERIMENT DESIGN CONFIGURATION
+// ============================================
+// Configure which features to manipulate in this experiment run
+// Set values as arrays to vary that dimension, or single values to hold constant
+//
+// Examples:
+//   - Full 2x2x2 design: frequency_ratios: ['1:2', '1:4'], time_pressures: [5, 10], payoff_structures: ['linear', 'binary']
+//   - Hold frequency constant at 1:4, manipulate time and payoff: frequency_ratios: ['1:4'], time_pressures: [5, 10], payoff_structures: ['linear', 'binary']
+//   - Only manipulate time pressure: frequency_ratios: ['1:4'], time_pressures: [5, 10], payoff_structures: ['linear']
+//
+const EXPERIMENT_DESIGN = {
+  // Frequency ratio: '1:2' or '1:4'
+  // To manipulate: ['1:2', '1:4']
+  // To hold constant: ['1:4']
+  frequency_ratios: ['1:4'],
+  
+  // Time pressure: 5 or 10 (seconds)
+  // To manipulate: [5, 10]
+  // To hold constant: [5] or [10]
+  time_pressures: [5, 10],
+  
+  // Payoff structure: 'linear' or 'binary'
+  // To manipulate: ['linear', 'binary']
+  // To hold constant: ['linear'] or ['binary']
+  payoff_structures: ['linear', 'binary']
+};
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+// Function to generate config file name from condition parameters
+function generateConfigFileName(frequencyRatio, timePressure, payoffStructure) {
+  // Convert frequency ratio to file format: '1:2' -> '1-2', '1:4' -> '1-4'
+  const freqStr = frequencyRatio.replace(':', '-');
+  const payoffSuffix = payoffStructure === 'binary' ? '_binary' : '';
+  return `js/${freqStr}_${timePressure}${payoffSuffix}.js`;
+}
+
+// Function to generate list of available config files based on EXPERIMENT_DESIGN
+function generateAvailableConfigFiles() {
+  const configFiles = [];
+  
+  // Generate all combinations of the specified values
+  for (const freqRatio of EXPERIMENT_DESIGN.frequency_ratios) {
+    for (const timePressure of EXPERIMENT_DESIGN.time_pressures) {
+      for (const payoffStructure of EXPERIMENT_DESIGN.payoff_structures) {
+        const configFile = generateConfigFileName(freqRatio, timePressure, payoffStructure);
+        configFiles.push(configFile);
+      }
+    }
+  }
+  
+  return configFiles;
+}
+
 // Function to dynamically load a script
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -13,21 +70,28 @@ function loadScript(src) {
 
 // Function to randomly select and load config, then load trial orders
 async function initializeExperiment() {
-  // List of available config files
-  const configFiles = [
-    'js/1-2_5.js',
-    'js/1-2_10.js',
-    'js/1-4_5.js',
-    'js/1-4_10.js'
-  ];
+  // First, load the base experiment config (shared across all conditions)
+  console.log('Loading base experiment config...');
+  await loadScript('js/experiment_config.js');
+  
+  // Generate list of available config files based on EXPERIMENT_DESIGN
+  const configFiles = generateAvailableConfigFiles();
+  
+  // Log the experimental design
+  console.log('Experimental Design Configuration:');
+  console.log('  Frequency Ratios:', EXPERIMENT_DESIGN.frequency_ratios);
+  console.log('  Time Pressures:', EXPERIMENT_DESIGN.time_pressures);
+  console.log('  Payoff Structures:', EXPERIMENT_DESIGN.payoff_structures);
+  console.log('  Total Conditions:', configFiles.length);
+  console.log('  Available Config Files:', configFiles);
   
   // Randomly select one config file
   const selectedConfigIndex = Math.floor(Math.random() * configFiles.length);
   const selectedConfigFile = configFiles[selectedConfigIndex];
   
-  console.log(`Loading config file: ${selectedConfigFile}`);
+  console.log(`Loading condition config file: ${selectedConfigFile}`);
   
-  // Load the selected config file
+  // Load the selected condition-specific config file (merges with base config)
   await loadScript(selectedConfigFile);
   
   // Store which config was selected for data logging
@@ -139,6 +203,7 @@ function startExperiment(selectedConfigName) {
       selected_config: selectedConfigName,
       frequency_ratio: EXPERIMENT_CONFIG.FREQUENCY_RATIO,
       time_pressure: EXPERIMENT_CONFIG.TIME_PRESSURE,
+      payoff_structure: EXPERIMENT_CONFIG.PAYOFF_STRUCTURE,
       angle_mapping: JSON.stringify(angleToWordMapping)
   });
 
@@ -246,7 +311,7 @@ const compliance_checkboxes_trial = {
       </div>
     </div>
   `,
-  choices: ['Continue'],
+  choices: ['Enter to continue'],
   button_html: function(choice, choice_index) {
     return `<button id="compliance-continue-btn" class="jspsych-btn" disabled style="
       padding: 12px 30px;
@@ -291,6 +356,19 @@ const compliance_checkboxes_trial = {
       checkboxNoAI.addEventListener('change', updateButtonState);
     }
     
+    // Add keyboard support for Enter key
+    function handleKeyPress(event) {
+      if (event.key === 'Enter' || event.code === 'Enter') {
+        event.preventDefault();
+        const bothChecked = checkboxNoWriting && checkboxNoAI && checkboxNoWriting.checked && checkboxNoAI.checked;
+        if (bothChecked && continueBtn && !continueBtn.disabled) {
+          continueBtn.click();
+        }
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyPress);
+    
     // Initial state
     updateButtonState();
   },
@@ -325,6 +403,7 @@ const exposure_instructions_trial = {
 const exposure_trial = {
     timeline: [{
         type: jsPsychSurveyHtmlForm,
+        button_label: 'Enter to continue',
         html: function() {
             // Get angle and label from timeline variables
             const angle = jsPsych.evaluateTimelineVariable('angle');
@@ -449,6 +528,7 @@ const familiarization_instructions_trial = {
 const familiarization_trial = {
   timeline: [{
     type: jsPsychSurveyHtmlForm,
+    button_label: 'Enter to continue',
     html: function() {
       // Get trial variables from the timeline_variables (from the JS trial list)
       // leftLabel and rightLabel are set in the trial data and represent the left and right positions
@@ -669,6 +749,7 @@ const recall_instructions_trial = {
 
 const recall_trial = {
   type: jsPsychSurveyHtmlForm,
+  button_label: 'Enter to continue',
   html: function() {
     const angle = jsPsych.evaluateTimelineVariable('angle');
     const label = jsPsych.evaluateTimelineVariable('label');
@@ -723,26 +804,8 @@ const recall_trials = {
   }
 }
 
-// Message trial showing "Saving your data and checking answers. Please do not close this page."
-
-// Data saving trial after each recall test
-const save_data_recall = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
-  type: jsPsychPipe,
-  action: "save",
-  experiment_id: EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID,
-  filename: () => `inprog_${recall_state.outer_loop_iteration}_${filename}`,
-  data_string: () => jsPsych.data.get().csv(),
-  wait_message: "Saving your data and checking answers. Please do not close this page.",
-  data: {
-    trial_type: 'save_data_recall'
-  },
-  on_finish: function(data) {
-    data.recall_iteration = recall_state.outer_loop_iteration;
-  }
-} : null;
-
 // Continue trial showing feedback based on recall performance
-const continue_after_save_trial = {
+const continue_after_recall_trial = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: function() {
     // Calculate recall performance
@@ -788,20 +851,11 @@ const continue_after_save_trial = {
   }
 };
 
-// Build the timeline for saving after recall
-const save_after_recall_timeline = [];
-if (EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID) {
-  if (save_data_recall) {
-    save_after_recall_timeline.push(save_data_recall);
-  }
-  save_after_recall_timeline.push(continue_after_save_trial);
-}
-
 const familiarization_trials_outer_loop = {
   timeline: [familiarization_trials, 
     recall_instructions_trial, 
     recall_trials,
-    ...save_after_recall_timeline],
+    continue_after_recall_trial],
   on_timeline_start: function() {
     // Increment for the first iteration (on_timeline_start only runs once)
     recall_state.outer_loop_iteration++;
@@ -851,6 +905,23 @@ const familiarization_trials_outer_loop = {
     return shouldLoop;
   }
 }
+
+// ============================================
+// Phase 5.5: Save Data After Training Complete
+// ============================================
+
+// Data saving trial after training is complete (after outer loop finishes)
+const save_data_after_training = EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID ? {
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: EXPERIMENT_CONFIG.DATAPIPE_EXPERIMENT_ID,
+  filename: () => `training_complete_${filename}`,
+  data_string: () => jsPsych.data.get().csv(),
+  wait_message: "Saving your data and checking answers. Please do not close this page.",
+  data: {
+    trial_type: 'save_data_after_training'
+  }
+} : null;
 
 // ============================================
 // Phase 6: Test Trials
@@ -969,31 +1040,48 @@ function findAngleForLabel(label) {
 
 // Helper function to calculate bonus points based on distance
 // Points range from 0 to 45 based on distance between tested angle and entered word's angle
-function calculateBonusPoints(enteredAngle, testedAngle) {
+// For binary payoff: gives full bonus if entered angle matches nearestTrainedAngle, 0 otherwise
+// For linear payoff: gives bonus proportional to distance from tested angle
+// Note: Instructions remain the same for both conditions to avoid revealing the manipulation
+function calculateBonusPoints(enteredAngle, testedAngle, nearestTrainedAngle) {
   if (enteredAngle === null) {
     return 0; // Invalid response
   }
   
-  const distance = angularDistance(enteredAngle, testedAngle);
+  const payoffStructure = EXPERIMENT_CONFIG.PAYOFF_STRUCTURE || 'linear';
+  // Use different maxPoints for binary vs linear to ensure similar displayed bonuses after rounding
+  // Binary: 40 points = $0.040 → rounds to $0.04 (matches typical linear bonus)
+  // Linear: 45 points = $0.045 max, but typically $0.040-$0.044 → rounds to $0.04
+  const maxPoints = payoffStructure === 'binary' ? 40 : 45;
+  const scale = EXPERIMENT_CONFIG.POINT_TO_BONUS_SCALE || 0.001;
   
-  // Maximum points for correct answer (distance = 0)
-  const maxPoints = 45;
-  
-  // Calculate raw points
   let points;
-  if (distance === 0) {
-    points = maxPoints;
+  
+  if (payoffStructure === 'binary') {
+    // Binary payoff: full bonus only if entered angle matches the nearest trained angle
+    // The nearestTrainedAngle is the angle closest to the tested angle
+    if (enteredAngle === nearestTrainedAngle) {
+      points = maxPoints; // Correct answer (provided the label for the angle closest to test angle)
+    } else {
+      points = 0; // Incorrect answer (including if they provided a different valid label)
+    }
   } else {
-    // Decrease points based on distance
-    // At 45 degrees (halfway between adjacent directions), give 0 points
-    // Linear interpolation: points = maxPoints * (1 - distance / 45)
-    points = Math.max(0, maxPoints * (1 - distance / 45));
+    // Linear payoff: proportional to distance from tested angle
+    const distance = angularDistance(enteredAngle, testedAngle);
+    
+    if (distance === 0) {
+      points = maxPoints;
+    } else {
+      // Decrease points based on distance
+      // At 45 degrees (halfway between adjacent directions), give 0 points
+      // Linear interpolation: points = maxPoints * (1 - distance / 45)
+      points = Math.max(0, maxPoints * (1 - distance / 45));
+    }
   }
   
   // Convert to dollars using the scale
-  const scale = EXPERIMENT_CONFIG.POINT_TO_BONUS_SCALE || 0.001;
   const bonusDollars = points * scale;
-  console.log('Bonus calculation:', { points, scale, bonusDollars });
+  console.log('Bonus calculation:', { payoffStructure, enteredAngle, testedAngle, nearestTrainedAngle, points, scale, bonusDollars });
   return Math.round(bonusDollars * 100) / 100; // Round to 2 decimal places
 }
 
@@ -1060,6 +1148,7 @@ let currentTrialTimedOut = false;
 
 const test_trial = {
   type: jsPsychSurveyHtmlForm,
+  button_label: 'Enter to continue',
   html: function() {
     const angle = jsPsych.evaluateTimelineVariable('angle');
     // Map angle identifier to actual word
@@ -1203,23 +1292,34 @@ const test_trial = {
     } else {
       // Calculate bonus points based on distance between tested angle and entered word's angle
       enteredAngle = findAngleForLabel(response);
-      bonusPoints = calculateBonusPoints(enteredAngle, angle);
+      bonusPoints = calculateBonusPoints(enteredAngle, angle, nearestTrainedAngle);
       distanceToTreasure = enteredAngle !== null 
         ? angularDistance(enteredAngle, angle) 
         : null;
+    }
+    
+    // Determine if treasure was found based on payoff structure
+    const payoffStructure = EXPERIMENT_CONFIG.PAYOFF_STRUCTURE || 'linear';
+    let foundTreasure;
+    if (payoffStructure === 'binary') {
+      foundTreasure = enteredAngle !== null && enteredAngle === nearestTrainedAngle;
+    } else {
+      foundTreasure = enteredAngle !== null && distanceToTreasure !== null && distanceToTreasure <= 45;
     }
     
     // Debug logging
     console.log('=== Test Trial Debug ===');
     console.log('Trial ID:', trialId);
     console.log('Timed out:', timedOut);
+    console.log('Payoff structure:', payoffStructure);
     console.log('Entered response:', response);
     console.log('Target label:', label);
     console.log('Tested angle (target):', angle);
+    console.log('Nearest trained angle:', nearestTrainedAngle);
     console.log('Entered angle:', enteredAngle !== null ? enteredAngle : 'NOT FOUND (invalid label)');
     console.log('Distance from target angle:', distanceToTreasure !== null ? distanceToTreasure + ' degrees' : 'N/A (invalid label)');
     console.log('Bonus points:', bonusPoints);
-    console.log('Found treasure:', enteredAngle !== null && distanceToTreasure !== null && distanceToTreasure <= 45);
+    console.log('Found treasure:', foundTreasure);
     console.log('=======================');
     
     // Update total points display
@@ -1241,7 +1341,8 @@ const test_trial = {
       trialType: trialType,
       isCritical: isCritical,
       targetFreq: targetFreq,
-      timedOut: timedOut
+      timedOut: timedOut,
+      foundTreasure: foundTreasure
     };
     
     data.is_correct = isCorrect;
@@ -1260,6 +1361,8 @@ const test_trial = {
     data.entered_angle = enteredAngle;
     data.total_points = totalPoints;
     data.timed_out = timedOut ? 1 : 0;
+    data.found_treasure = foundTreasure ? 1 : 0;
+    data.payoff_structure = payoffStructure;
   }
 }
 
@@ -1302,10 +1405,9 @@ const test_feedback_trial = {
     }
     
     // Normal feedback (not timed out)
-    const distance = lastTrialData.enteredAngle !== null 
-      ? angularDistance(lastTrialData.enteredAngle, lastTrialData.angle) 
-      : Infinity;
-    const foundTreasure = lastTrialData.enteredAngle !== null && distance <= 45;
+    // Use the foundTreasure value already calculated and stored in lastTrialData
+    // This ensures consistency with the bonus calculation logic (binary vs linear)
+    const foundTreasure = lastTrialData.foundTreasure || false;
     const imageSrc = foundTreasure ? 'stimuli/images/treasure.png' : 'stimuli/images/hole.png';
     
     return `
@@ -1421,6 +1523,7 @@ let exactCurrentTrialTimedOut = false;
 
 const exact_angle_test_trial = {
   type: jsPsychSurveyHtmlForm,
+  button_label: 'Enter to continue',
   html: function() {
     const angle = jsPsych.evaluateTimelineVariable('angle');
     const compassHTML = createCompassHTML(angle);
@@ -1548,22 +1651,35 @@ const exact_angle_test_trial = {
       bonusPoints = 0;
     } else {
       enteredAngle = findAngleForLabel(response);
-      bonusPoints = calculateBonusPoints(enteredAngle, angle);
+      // For exact angle trials, nearestTrainedAngle is the same as angle
+      bonusPoints = calculateBonusPoints(enteredAngle, angle, angle);
       distanceToTreasure = enteredAngle !== null 
         ? angularDistance(enteredAngle, angle) 
         : null;
+    }
+    
+    // Determine if treasure was found based on payoff structure
+    const payoffStructure = EXPERIMENT_CONFIG.PAYOFF_STRUCTURE || 'linear';
+    let foundTreasure;
+    if (payoffStructure === 'binary') {
+      // For exact angle trials, nearestTrainedAngle is the same as angle
+      foundTreasure = enteredAngle !== null && enteredAngle === angle;
+    } else {
+      foundTreasure = enteredAngle !== null && distanceToTreasure !== null && distanceToTreasure <= 45;
     }
     
     // Debug logging
     console.log('=== Exact Angle Test Trial Debug ===');
     console.log('Trial ID:', trialId);
     console.log('Timed out:', timedOut);
+    console.log('Payoff structure:', payoffStructure);
     console.log('Entered response:', response);
     console.log('Target label:', label);
     console.log('Tested angle (exact):', angle);
     console.log('Entered angle:', enteredAngle !== null ? enteredAngle : 'NOT FOUND');
     console.log('Distance from target:', distanceToTreasure !== null ? distanceToTreasure + ' degrees' : 'N/A');
     console.log('Bonus points:', bonusPoints);
+    console.log('Found treasure:', foundTreasure);
     console.log('====================================');
     
     // Update total points display
@@ -1585,7 +1701,8 @@ const exact_angle_test_trial = {
       trialType: trialType,
       isCritical: isCritical,
       targetFreq: targetFreq,
-      timedOut: timedOut
+      timedOut: timedOut,
+      foundTreasure: foundTreasure
     };
     
     data.is_correct = isCorrect;
@@ -1602,6 +1719,8 @@ const exact_angle_test_trial = {
     data.entered_angle = enteredAngle;
     data.total_points = totalPoints;
     data.timed_out = timedOut ? 1 : 0;
+    data.found_treasure = foundTreasure ? 1 : 0;
+    data.payoff_structure = payoffStructure;
   }
 }
 
@@ -1646,6 +1765,7 @@ const final_recall_instructions_trial = {
 
 const final_recall_trial = {
   type: jsPsychSurveyHtmlForm,
+  button_label: 'Enter to continue',
   html: function() {
     const angle = jsPsych.evaluateTimelineVariable('angle');
     const label = jsPsych.evaluateTimelineVariable('label');
@@ -1792,14 +1912,23 @@ const timeline = [
   exposure_instructions_trial,
   exposure_trials,
   familiarization_instructions_trial,
-  familiarization_trials_outer_loop,
+  familiarization_trials_outer_loop
+];
+
+// Add save data trial after training if datapipe is configured
+if (save_data_after_training) {
+  timeline.push(save_data_after_training);
+}
+
+// Continue with test trials
+timeline.push(
   test_instructions_trial,
   test_trials,
   exact_angle_test_trials,
   final_recall_instructions_trial,
   final_recall_trials,
   survey_trial
-];
+);
 
 if (save_data_end) {
   timeline.push(save_data_end);

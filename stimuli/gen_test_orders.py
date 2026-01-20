@@ -4,15 +4,36 @@ import csv
 
 n_orders = 100
 
+# =============================================================================
+# CONDITION SETTINGS - Choose ONE of the following configurations:
+# =============================================================================
+# For 1:2 ratio (72 near distance trials, 136 total):
+#   HF_count = 2, LF_count = 1, rep_in_block = 2, near_distance_rep = 3
+#   Each HF angle: 12 appearances, Each LF angle: 6 appearances (ratio 2:1)
+#
+# For 1:4 ratio (60 near distance trials, 124 total):
+#   HF_count = 4, LF_count = 1, rep_in_block = 3, near_distance_rep = 1
+#   Each HF angle: 12 appearances, Each LF angle: 3 appearances (ratio 4:1)
+#
+# Note: These settings produce a reasonable difference of 12 near-distance trials
+# per block (72 vs 60) while maintaining the frequency ratios (2:1 vs 4:1)
+# =============================================================================
+
+# --- 1:2 ratio settings ---
+# Produces: 72 near-distance + 64 far-distance = 136 trials per block
+# HF: 48 appearances, LF: 24 appearances (ratio 2:1)
+#HF_count = 2
+#LF_count = 1
+#rep_in_block = 2
+#near_distance_rep = 3
+
+# --- 1:4 ratio settings (uncomment to use) ---
+# Produces: 60 near-distance + 64 far-distance = 124 trials per block
+# HF: 48 appearances, LF: 12 appearances (ratio 4:1)
 HF_count = 4
 LF_count = 1
-
-rep_in_block = 3 #creates the number of trials in each block 
-# 2 for 1:2, 3 for 1:4
-near_distance_rep = 3 #sets number of near distance trials in each block
-# 1 for 1:2, 3 for 1:4
-# for 1:2 this creates N = 72 near distance trials in each ND block, 136 trials total
-# for 1:4 this creates N = 60 near distance trials in each ND block, 124 trials total
+rep_in_block = 3
+near_distance_rep = 1
 
 HF_items = {"angle_1":15, "angle_2":60, "angle_5":195, "angle_6":240}
 LF_items = {"angle_3":105, "angle_4":150, "angle_7":285, "angle_8":330}
@@ -95,8 +116,8 @@ for block in range(n_orders):
         (285, 240, "angle_7", "angle_6", True), # HF-LF (critical)
         (285, 330, "angle_7", "angle_8", False), # LF-LF
         (330, 285, "angle_8", "angle_7", False), # LF-LF
-        (330, 15, "angle_8", "angle_1", False), # LF-HF
-        (15, 330, "angle_1", "angle_8", False), # LF-HF
+        (330, 15, "angle_8", "angle_1", True), # LF-HF (critical - crosses 0° boundary)
+        (15, 330, "angle_1", "angle_8", True), # HF-LF (critical - crosses 0° boundary)
     ]
     
     far_distance_trials = []
@@ -150,7 +171,7 @@ for block in range(n_orders):
     np.random.shuffle(near_distance_trials)
     np.random.shuffle(far_distance_trials)
     
-    first_near_distance_trial_count = (len(HF_items)*HF_count+len(LF_items)*LF_count)*rep_in_block #24 for 1:2 ratio, 20 for 1:4 ratio
+    first_near_distance_trial_count = (len(HF_items)*HF_count+len(LF_items)*LF_count)*rep_in_block #24 for 1:2 ratio, 60 for 1:4 ratio
     first_set_near_distance_trials = near_distance_trials[:first_near_distance_trial_count]
     remaining_near_distance_trials = near_distance_trials[first_near_distance_trial_count:]
     rest_of_trials = remaining_near_distance_trials + far_distance_trials
