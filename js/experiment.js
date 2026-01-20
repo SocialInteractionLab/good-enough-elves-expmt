@@ -359,20 +359,29 @@ const compliance_checkboxes_trial = {
     // Add keyboard support for Enter key
     function handleKeyPress(event) {
       if (event.key === 'Enter' || event.code === 'Enter') {
-        event.preventDefault();
         const bothChecked = checkboxNoWriting && checkboxNoAI && checkboxNoWriting.checked && checkboxNoAI.checked;
         if (bothChecked && continueBtn && !continueBtn.disabled) {
+          event.preventDefault();
           continueBtn.click();
         }
+        // If button is disabled, don't prevent default - let the form handle it normally
       }
     }
     
     document.addEventListener('keydown', handleKeyPress);
     
+    // Store handler reference for cleanup
+    window.complianceKeyHandler = handleKeyPress;
+    
     // Initial state
     updateButtonState();
   },
   on_finish: function(data) {
+    // Remove the keyboard event listener to avoid interfering with other forms
+    if (window.complianceKeyHandler) {
+      document.removeEventListener('keydown', window.complianceKeyHandler);
+      window.complianceKeyHandler = null;
+    }
     const checkboxNoWriting = document.getElementById('checkbox-no-writing');
     const checkboxNoAI = document.getElementById('checkbox-no-ai');
     data.compliance_no_writing = checkboxNoWriting ? checkboxNoWriting.checked : false;
