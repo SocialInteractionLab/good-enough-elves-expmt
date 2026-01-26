@@ -7,11 +7,11 @@ const EXPERIMENT_CONFIG = {
   PROLIFIC_COMPLETION_CODE: 'C1G4BSWV',
   
   // DataPipe experiment ID
-  DATAPIPE_EXPERIMENT_ID: 'o4nUmcwaw50b', 
+  DATAPIPE_EXPERIMENT_ID: '1oMItx9At2Cu', 
   
   // Experiment settings
   EXPERIMENT_NAME: 'elves_treasure_hunt',
-  EXPERIMENT_VERSION: '1.2.0',
+  EXPERIMENT_VERSION: '1.2.1',
   
   // Timing constants (in milliseconds) - same for all conditions
   ITI: 500, // Inter-trial interval

@@ -25,7 +25,7 @@ const EXPERIMENT_DESIGN = {
   // Payoff structure: 'linear' or 'binary'
   // To manipulate: ['linear', 'binary']
   // To hold constant: ['linear'] or ['binary']
-  payoff_structures: ['linear', 'binary']
+  payoff_structures: ['linear']
 };
 
 // ============================================
