@@ -15,7 +15,7 @@ const EXPERIMENT_DESIGN = {
   // Frequency ratio: '1:2' or '1:4'
   // To manipulate: ['1:2', '1:4']
   // To hold constant: ['1:4']
-  frequency_ratios: ['1:4'],
+  frequency_ratios: ['1:2'],
   
   // Time pressure: 5 or 10 (seconds)
   // To manipulate: [5, 10]
@@ -25,7 +25,7 @@ const EXPERIMENT_DESIGN = {
   // Payoff structure: 'linear' or 'binary'
   // To manipulate: ['linear', 'binary']
   // To hold constant: ['linear'] or ['binary']
-  payoff_structures: ['linear']
+  payoff_structures: ['linear', 'binary']
 };
 
 // ============================================
