@@ -7,7 +7,7 @@ const EXPERIMENT_CONFIG = {
   PROLIFIC_COMPLETION_CODE: 'C1G4BSWV',
   
   // DataPipe experiment ID
-  DATAPIPE_EXPERIMENT_ID: 'FTWpA171hAtR', 
+  DATAPIPE_EXPERIMENT_ID: 'eKOGpN4qj0M3', 
   
   // Experiment settings
   EXPERIMENT_NAME: 'elves_treasure_hunt',
